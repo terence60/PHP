@@ -21,7 +21,7 @@ echo "<h2>01 - Connexion à la BDD</h2>";
 
 $host = "mysql:host=localhost;dbname=entreprise";
 $login = "root";
-$password = "root"; // ici "root" pour mamp
+$password = ""; // ici "root" pour mamp
 $options = array(
     PDO::ATTR_ERRMODE => PDO::ERRMODE_WARNING
 );
@@ -29,13 +29,13 @@ $options = array(
 // Création de l'objet PDO
 try {
     $pdo = new PDO($host, $login, $password, $options);
-} catch (PDOException $e) {
+} catch (Exception $e) {
     echo "Erreur de BDD";
     exit;
 }
 
 var_dump($pdo);
-    // object(PDO)[1] // Si je vois l'objet PDO, alors ça y est, je suis bien connecté à ma BDD
+// object(PDO)[1] // Si je vois l'objet PDO, alors ça y est, je suis bien connecté à ma BDD
 
 echo "<h2>02 - Requêtes de type action (INSERT / UPDATE / DELETE)</h2>";
 
@@ -114,10 +114,10 @@ echo "Prenom de l'employé : " . $data["prenom"];
 
 
 // RECAP 
-    // TOUJOURS 3 étapes pour manipuler la base de données 
-        // 1 ère étape : Création de l'objet PDO, il représente le lien d'accès vers ma base de données 
-        // 2 ème étape : Lancement d'une requête sur l'objet PDO, je récupère un PDOStatement qui représente le jeu de résultat (non exploitable)
-        // 3 ème étape : Je lance la méthode fetch() sur PDOStatement, je récupère un array(ou un objet) que je peux exploiter en PHP 
+// TOUJOURS 3 étapes pour manipuler la base de données 
+// 1 ère étape : Création de l'objet PDO, il représente le lien d'accès vers ma base de données 
+// 2 ème étape : Lancement d'une requête sur l'objet PDO, je récupère un PDOStatement qui représente le jeu de résultat (non exploitable)
+// 3 ème étape : Je lance la méthode fetch() sur PDOStatement, je récupère un array(ou un objet) que je peux exploiter en PHP 
 
 // Une ligne traitée avec fetch, n'existe plus dans la réponse, c'est pour ça que je ne peux pas refaire fetch plusieurs fois à la suite sur ce résultat à une seule ligne
 
@@ -152,11 +152,141 @@ echo "Nombre d'employés : " . $stmt->rowCount() . "<hr>";
 // var_dump($data);
 // echo "<hr>";
 
-while($data = $stmt->fetch(PDO::FETCH_ASSOC)) {
-    var_dump($data);
-    echo "<hr>";
-}
+// while ($data = $stmt->fetch(PDO::FETCH_ASSOC)) {
+//     var_dump($data);
+//     echo "<hr>";
+// }
 
+// Libre à nous d'interpréter les données comme on le souhaite ! 
+// On oublie pas que la BDD relie le côté front et back du site, mais on manipule toujours la même donnée
+// Je peux faire un affichage en petite carte côté front, et je peux faire un affichage type tableau de gestion en backoffice
+// Deux affichages différents, deux manipulations différentes, mais on parle toujours de la même table employes
+
+
+// Petites cartes employés
+
+echo '<div style="display:flex; flex-wrap: wrap; justify-content: space-between">';
+
+// | id_employes | prenom  | nom    | sexe | service | date_embauche | salaire |
+
+// Chaque tour de boucle while me permet de récupérer les informations d'un employé, dans $data
+while ($data = $stmt->fetch(PDO::FETCH_ASSOC)): ?>
+    <div style="margin-top: 20px; padding: 1%; width: 20%; background-color: steelblue; color:white">
+        ID : <?= $data["id_employes"] ?> <br>
+        Prenom : <?= $data["prenom"] ?> <br>
+        Nom : <?= $data["nom"] ?> <br>
+        Sexe : <?= $data["sexe"] ?> <br>
+        Service : <?= $data["service"] ?> <br>
+        Date d'embauche : <?= $data["date_embauche"] ?> <br>
+        Salaire : <?= $data["salaire"] ?> <br>
+    </div>
+<?php endwhile;
+echo '</div><br><br>';
+
+$stmt = $pdo->query("SELECT * FROM employes");
+
+// Ici on va afficher sous forme de tableau type interface de gestion
+?>
+<style>
+    th,
+    td {
+        padding: 10px;
+    }
+</style>
+<table border="1" style="border-collapse: collapse; width:100%">
+    <tr>
+        <th>Id employés</th>
+        <th>Prénom</th>
+        <th>Nom</th>
+        <th>Sexe</th>
+        <th>Service</th>
+        <th>Date d'embauche</th>
+        <th>Salaire</th>
+        <th>Actions</th>
+    </tr>
+    <?php
+
+    while ($data = $stmt->fetch(PDO::FETCH_ASSOC)) {
+        echo "<tr>";
+        foreach ($data as $valeur) {
+            echo "<td>$valeur</td>";
+        }
+        echo "<td>Voir - Modifier - Supprimer</td>";
+        echo "</tr>";
+    }
+    ?>
+</table>
+<?php
+
+
+// Maintenant dans un tableau html qui s'adapte à la taille de notre requête (notre de colonne dynamique)
+$stmt = $pdo->query("SELECT * FROM employes");
+// Il existe de nombreuses methodes à PDO Statement
+// Par exemple : rowCount() c'est le nombre de lignes
+// Mais aussi columnCount() c'est le nombre de colonnes de ma requête
+echo "Nombre de colonnes dans ma requête : " . $stmt->columnCount() . "<hr>";
+// Il existe aussi une méthode getColumnMeta() qui prends en param un int correspondant à un chiffre de colonne, par exemple la première colonne du résultat porte le chiffre 0 (comme un array)
+// Et cette méthode nous renvoie un array contenant des informations sur la colonne en cours
+// Dans ce array est contenu un indice "name" qui indique le nom de la colonne
+var_dump($stmt->getColumnMeta(0));
+?>
+<table border="1" style="border-collapse: collapse; width:100%">
+    <tr>
+        <?php
+        // Chaque tour de boucle permet de récupérer une colonne dans le résultat et de créer un <th>
+        for ($i = 0; $i < $stmt->columnCount(); $i++) {
+            $infoColonne = $stmt->getColumnMeta($i);
+            echo "<th>" . $infoColonne["name"] . "</th>";
+        }
+        ?>
+    </tr>
+
+    <?php
+    // while ($data = $stmt->fetch(PDO::FETCH_ASSOC)) {
+    //     echo "<tr>";
+    //     foreach ($data as $valeur) {
+    //         echo "<td>$valeur</td>";
+    //     }
+    //     echo "</tr>";
+    // }
+    ?>
+</table>
+<?php
+
+echo "<h2>05 - Requêtes de sélection pour plusieurs lignes de résultat avec fetchAll()</h2>";
+
+// fetch() permet de traiter une seule ligne à la fois, j'ai donc la nécessité de faire une boucle pour avancer dans le résultat
+// fetchAll() traite toutes les lignes en une seule fois sauf que l'on obtient un array à deux niveaux, premier niveau indexé numériquement, chaque indice correspond à un employé, lui même un array, cette fois ci associatif
+
+$stmt = $pdo->query("SELECT * FROM employes");
+
+$data = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+var_dump($data);
+// Ci dessous une portion du résultat
+// array (size=24)
+//   0 => 
+//     array (size=7)
+//       'id_employes' => int 350
+//       'prenom' => string 'Jean-pierre' (length=11)
+//       'nom' => string 'Laborde' (length=7)
+//       'sexe' => string 'm' (length=1)
+//       'service' => string 'direction' (length=9)
+//       'date_embauche' => string '2010-12-09' (length=10)
+//       'salaire' => float 5000
+//   1 => 
+//     array (size=7)
+//       'id_employes' => int 388
+//       'prenom' => string 'Clement' (length=7)
+//       'nom' => string 'Gallet' (length=6)
+//       'sexe' => string 'm' (length=1)
+//       'service' => string 'commercial' (length=10)
+//       'date_embauche' => string '2010-12-15' (length=10)
+//       'salaire' => float 2300
+
+
+// Comment afficher Jean-Pierre ?
+echo $data[0]["prenom"];
 
 
 
