@@ -2,6 +2,40 @@
 
 /* 
 
+// Pour éviter les injections XSS (du code css et/ou js mis dans les commentaires)
+// il est possible de modifier les carac notamment les < > qui représentent des balises.
+// à l'affichage (voir en bas de page) on appelle htmlspecialchars() qui permet de transformer ces caractères problématiques en entités html
+// exemple :
+// <script>while(true){alert('truc');}</script>
+// sera écrit dans le code source sous cette forme :
+// &lt;script&gt;while(true){alert('truc');}&lt;/script&gt;
+
+// Ci dessus une boucle infinie en JS, lançant une alert
+// Ci dessous un style body display none qui ne nous permet plus d'intéragir avec le site web
+// <style>body{display:none;}</style>
+
+// Outils proche de htmlspecialchars() : htmlentities() / strip_tags()
+
+// Pour tester les injections SQL, il faut lancer les requêtes en query
+// Pour faire une injection par le champ message il faut : 
+    // Saisir un pseudo valide
+    // Ensuite faire bug le champ message via une quote/apostrophe '  pour clôturer le champ message
+    // On termine ensuite la requête de façon classique avec la valeur NOW()); 
+    // Pour ensuite lancer la requête de notre choix
+
+    // Par exemple 
+    // ', NOW()); DROP DATABASE dialogue;
+    // Ci dessus la requête va supprimer notre base de données entière ! 
+
+    // Il faudra toujours désactiver les messages d'erreurs de PDO et de PHP pour s'assurer que des informations sensibles ne transitent pas par eux par exemple nom de table, chemin physique d'accès serveur 
+
+    // Même si les messages sont désactivés, une injection en aveugle en lançant l'instruction DO SLEEP(10) me permet de comprendre que le formulaire est sensible aux injections 
+
+    // Si le form est sensible aux injections toute la base est compromise ! Récupération d'informations
+    // En utilisant les methode SQL SELECT * INTO OUTFILE,   puis LOAD_FILE, je suis capable de stocker dans un fichier des informations récupérées d'une autre base, pour les réinsérer ailleurs sur une table sur laquelle j'ai la visibilité, idem on peut récupérer de cette manière le nom de la base de données
+
+
+
 EXERCICE TP Dialogue :
 ----------
 
@@ -59,6 +93,7 @@ try {
 
 $erreur = "";
 $success = "";
+$req = "";
 
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST["pseudo"], $_POST["message"])) {
     // echo "<h2>OK JE PASSE BIEN DANS LE IF DE POST</h2>";
@@ -92,7 +127,22 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST["pseudo"], $_POST["mess
         // Si tous les contrôles sont bons, j'applique une dernière vérification (sur une variable $erreur ? peut être) pour savoir si j'enregistre ou pas
         // Si tout est ok, alors je peux lancer sur pdo une requête insert into des éléments reçus du formulaire
         try {
-            $stmt = $pdo->query("INSERT INTO commentaire (pseudo, message, date_enregistrement) VALUES ('$pseudo', '$message', NOW())");
+
+            // Si ici, je laisse ma requête s'exécuter avec query, alors je suis sensible aux injections SQL
+            // C'est gravissime !!! TOUTE MA BASE EST COMPROMISE SI UN FORM EST SENSIBLE AUX INJECTIONS !
+            // Le pirate peut supprimer, ma table, récupérer des données d'autres tables de ma base, même supprimer la base entière !
+            // Si pas de sauvegarde de mon côté... Tout est perdu ! 
+
+            // Toujours bon de mettre un sleep(1) (une seconde) sur tout traitement, cela évite les attaques de force brute qui risque de surcharger le serveur et sa bande passante
+            sleep(1);
+            $req = "INSERT INTO commentaire (pseudo, message, date_enregistrement) VALUES ('$pseudo', '$message', NOW())";
+            // $stmt = $pdo->query($req);
+            $stmt = $pdo->prepare("INSERT INTO commentaire (pseudo, message, date_enregistrement) VALUES (:pseudo, :message, NOW())");
+            $stmt->bindParam(':pseudo', $pseudo, PDO::PARAM_STR);
+            $stmt->bindParam(':message', $message, PDO::PARAM_STR);
+            $stmt->execute();
+
+
             $success .= '<div class="alert alert-success" role="alert">Message enregistré !</div>';
         } catch (Exception $e) {
             $erreur .= '<div class="alert alert-danger" role="alert">Attention le pseudo est trop court !</div>';
@@ -171,6 +221,7 @@ $commentaires = $stmt->fetchAll(PDO::FETCH_ASSOC);
                     <!-- Affichage des erreurs -->
                     <?= $erreur ?>
                     <?= $success ?>
+                    <?= $req ?>
 
                     <hr>
                     <div class="mb-3">
@@ -196,10 +247,11 @@ $commentaires = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 foreach ($commentaires as $commentaire) : ?>
                     <div class="card w-75 mx-auto mb-3">
                         <div class="card-header bg-dark text-white">
-                            <?php echo "Par : " . $commentaire["pseudo"] . " le : " . $commentaire["date_fr"] ?>
+                            <!-- Ici htmlspecialchars me permet de me protéger de l'interprétation de code html css js, je ne souhaite pas que dans les messages et pseudo de l'utilisateur, il y est du code interprété (alert JS, style css ou autre) -->
+                            <?php echo "Par : " . htmlspecialchars($commentaire["pseudo"]) . " le : " . $commentaire["date_fr"] ?>
                         </div>
                         <div class="card-body">
-                            <p class="card-text"><?= $commentaire["message"] ?></p>
+                            <p class="card-text"><?= htmlspecialchars($commentaire["message"]) ?></p>
                         </div>
                     </div>
                 <?php endforeach;
