@@ -21,7 +21,7 @@ echo "<h2>01 - Connexion à la BDD</h2>";
 
 $host = "mysql:host=localhost;dbname=entreprise";
 $login = "root";
-$password = ""; // ici "root" pour mamp
+$password = "root"; // ici "root" pour mamp
 $options = array(
     PDO::ATTR_ERRMODE => PDO::ERRMODE_WARNING
 );
@@ -288,8 +288,100 @@ var_dump($data);
 // Comment afficher Jean-Pierre ?
 echo $data[0]["prenom"];
 
+// EXERCICE : Affichez les noms et prénoms des employés dans une liste ul li 
+        // Le faire avec fetch
+        // Le faire aussi avec fetchAll
 
 
+// Avec fetch
+$stmt = $pdo->query("SELECT nom, prenom FROM employes");
 
-    
-       
+echo "<ul>";
+while($data = $stmt->fetch(PDO::FETCH_ASSOC)) {
+    echo "<li>" . $data["nom"] . " " . $data["prenom"] . "</li>";
+}
+echo "</ul><hr><hr>";
+
+// Avec fetchAll et foreach
+$stmt = $pdo->query("SELECT nom, prenom FROM employes");
+$employes = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+echo "<ul>";
+foreach($employes AS $employe) {
+    echo "<li>" . $employe["nom"] . " " . $employe["prenom"] . "</li>";
+}
+echo "</ul><hr><hr>";
+
+// Avec fetchAll et for
+$stmt = $pdo->query("SELECT nom, prenom FROM employes");
+$employes = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+echo "<ul>";
+for($i = 0; $i < count($employes); $i++) {
+    echo "<li>" . $employes[$i]["nom"] . " " . $employes[$i]["prenom"] . "</li>";
+}
+echo "</ul><hr><hr>";
+
+// En programmation en PHP pour la manipulation de la BDD, on préfèrera toujours utiliser fetchAll()
+// Il est plus simple de traiter l'entièreté du résultat dans une seule variable (ci dessus, $employes)
+
+echo "<h2>06 - Requêtes préparées avec prepare() pour se protéger des injections SQL !</h2>";
+
+// prepare() permet de sécuriser les requêtes pour éviter les injections SQL
+// Si dans la requête on attend une information provenant de l'utilisateur (formulaire, saisie, url, clic) alors OBLIGATION de faire prepare() (dans le doute faites toujours prepare())
+
+// On suppose qu'on a récupéré ça d'un formulaire POST
+// Un utilisateur cherche un employé en tapant son nom de famille
+$nom = "laborde";
+
+// Première étape : Préparation de la requête 
+
+// Première syntaxe possible, en utilisant des "?" pour indiquer les endroits avec valeurs attendues 
+// En fait, on prépare une requête à "trous" que l'on va remplir dans un second temps 
+
+// Dans la requête ci dessous je spécifie la structure de la requête et j'indique que j'attends une valeur pour le nom, symbolisée par "?"
+$stmt = $pdo->prepare("SELECT * FROM employes WHERE nom = ?");
+// La méthode execute() me permet d'executer la requête préparée, elle attend des params, surtout un array qui contiendra autant de valeur que de "?" dans la requête (dans l'ordre!)
+// Ici j'attends un seul param, donc je fourni un array avec une seule valeur, le $nom récupéré du supposé formulaire
+$stmt->execute([$nom]);
+
+$data = $stmt->fetch(PDO::FETCH_ASSOC);
+var_dump($data);
+
+// Cette syntaxe, bien que rapide, manque de lisibilité
+// Sur une requête à peu de params, OK
+// Sur une requête à beaucoup de param, ça complexifie la lisibilité
+// Par exemple ci dessous pour une requête INSERT, on perd en lisibilité et on peut se tromper sur l'ordre dans lequel on fournit les params
+
+// $stmt = $pdo->prepare("INSERT INTO employes (prenom, nom, salaire, sexe, date_embauche, service) VALUES (?, ?, ?, ?, ?, ?)");
+// $stmt->execute([$prenom, $nom, $salaire, $sexe, $date_embauche, $service]);
+
+
+// On préfèrera utiliser la façon avec les "tokens"  "marqueurs nominatif"
+
+$stmt = $pdo->prepare("SELECT * FROM employes WHERE nom = :nom"); // On nomme ici les valeurs attendues par un mot précédé de ":" ici j'attends une valeur qui est censée remplacer :nom 
+
+// La méthode bindParam me permet de rattacher un token à une valeur, ici je dis que je fais la liaison entre :nom et $nom
+// J'en profite pour appliquer le filtre de mon choix, ici PARAM_STR qui transforme le contenu de la variable $nom en string pur (rien ne sera interprété)
+// En MySQL pas de soucis pour envoyer tous nos éléments sous forme de "string", le serveur MySQL sera capable de retrier les types de son côté
+$stmt->bindParam(":nom", $nom, PDO::PARAM_STR);
+
+// Une fois tous mes bindParam effectués, je peux executer la requête avec execute()
+$stmt->execute();
+
+$data = $stmt->fetch(PDO::FETCH_ASSOC);
+var_dump($data);
+
+
+// Avec une requêtes à plusieurs tokens, c'est peut être plus long d'écrire tous les bindParam, mais au moins c'est clair et on limite le risque d'oublie et d'erreur 
+//$stmt = $pdo->prepare("INSERT INTO employes (prenom, nom, salaire, sexe, date_embauche, service) VALUES (:prenom, :nom, :salaire, :sexe, CURDATE(), :service)");
+//$stmt->bindParam(":prenom", $prenom, PDO::PARAM_STR);
+//$stmt->bindParam(":nom", $nom, PDO::PARAM_STR);
+//$stmt->bindParam(":salaire", $salaire, PDO::PARAM_STR);
+//$stmt->bindParam(":sexe", $sexe, PDO::PARAM_STR);
+//$stmt->bindParam(":service", $service, PDO::PARAM_STR);
+//$stmt->execute();
+
+
+ 
+
