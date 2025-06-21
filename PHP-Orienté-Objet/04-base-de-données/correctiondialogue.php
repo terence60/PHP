@@ -69,10 +69,10 @@ EXERCICE TP Dialogue :
 // - 02 : Créer une connexion à cette base avec PDO (new PDO)
 $host = "mysql:host=localhost;dbname=dialogue";
 $login = "root";
-$password = ""; // ici "root" pour mamp
+$password = "root"; // ici "root" pour mamp
 $options = array(
     PDO::ATTR_ERRMODE => PDO::ERRMODE_WARNING
-);
+); 
 
 // Création de l'objet PDO
 try {
